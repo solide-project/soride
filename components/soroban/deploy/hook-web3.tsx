@@ -2,8 +2,10 @@ import { useState } from "react"
 
 import { SorobanSmartContract } from "@/lib/stellar/contract"
 import { DeployedContracts } from "@/lib/stellar/interfaces"
+import { useProgram } from "../provider"
 
 export const useWeb3Hook = () => {
+    const { networkServer } = useProgram()
     const [contracts, setContracts] = useState<DeployedContracts>({})
 
     const executeSend = async (
@@ -46,31 +48,30 @@ export const useWeb3Hook = () => {
     }
 
     const doDeploy = async ({
-        contractAddress,
+        contractId,
         deployData,
-        abi = []
     }: {
-        contractAddress?: string
+        contractId?: string
         deployData: string
-        abi?: any
     }) => {
-        console.log(abi)
+        if (contractId) {
+            const contract = new SorobanSmartContract(contractId, networkServer)
+            await contract.init()
 
-        if (contractAddress) {
-            // contractAddress = getAddress(contractAddress)
+            console.log(contract.abi)
             setContracts({
                 ...contracts,
-                [contractAddress]: new SorobanSmartContract(contractAddress, abi),
+                [contractId]: contract,
             })
-            return { contract: contractAddress, transactionHash: "" }
+            return { contract: contractId, transactionHash: "" }
         }
 
         const result = {} as any
-        contractAddress = result.contract as string
-        setContracts({
-            ...contracts,
-            [contractAddress]: new SorobanSmartContract(contractAddress, abi),
-        })
+        // contractAddress = result.contract as string
+        // setContracts({
+        //     ...contracts,
+        //     [contractAddress]: new SorobanSmartContract(contractAddress, abi),
+        // })
 
         return result
     }

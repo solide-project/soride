@@ -1,5 +1,5 @@
 export interface CompileInput {
-    language: "Stylus"
+    language: "Soroban"
     settings?: {
         outputSelection: any
         optimizer: any

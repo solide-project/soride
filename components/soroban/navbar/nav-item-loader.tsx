@@ -5,7 +5,6 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { Braces } from "lucide-react"
 
-import { ChainID } from "@/lib/chains"
 import { Button } from "@/components/ui/button"
 import {
   Drawer,

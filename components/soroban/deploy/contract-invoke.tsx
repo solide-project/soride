@@ -1,11 +1,9 @@
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useProgram } from "@/components/soroban/provider";
 import { Input } from "@/components/ui/input";
 import { useLogger } from "@/components/core/providers/logger-provider";
-import { ethers } from "ethers";
 import { CollapsibleChevron } from "@/components/core/components/collapsible-chevron";
-import { ABIEntry, ABIParameter, abiParameterToNative, parse } from "@/lib/stylus/evm";
 import { Title } from "@/components/core/components/title";
 import { useWeb3Hook } from "./hook-web3";
 import {
@@ -17,12 +15,16 @@ import {
 } from "@/components/ui/dialog"
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getTransactionExplorer } from "@/lib/chains/explorer";
+import { ConnectWallet } from "../wallet";
+import { getContractId, isContractHash, isContractId, scSpecTypeToScVal, toScVal } from "@/lib/stellar/utils";
+import { Abi, AbiFunction, AbiParameter } from "@/lib/stellar/abi";
+import { xdr } from "@stellar/stellar-sdk";
 
 interface ContractInvokeProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function ContractInvoke({ className }: ContractInvokeProps) {
     const web3Hook = useWeb3Hook();
-    const { abi, setABI, deployData } = useProgram();
+    const soroban = useProgram();
     const logger = useLogger();
 
     const [msgValue, setMsgValue] = useState<number>(0)
@@ -79,206 +81,204 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
         logger.info("Deploying contract...")
 
         // This is to determined if we are deploying an existing contract
-        // const isPreDeployed = !!contractAddress
-        // const result = await web3Hook.doDeploy({ contractAddress, deployData, abi: processedABI })
-        // if (result.contract) {
-        //     setContractAddress(result.contract)
-        //     logger.success(`Contract deployed at ${result.contract}`)
+        const isPreDeployed = !!contractAddress
 
-        //     setContractArguments({
-        //         ...contractArguments,
-        //         [result.contract]: {},
-        //     })
+        // CBKGPQUWV55UPWCMQ4CZP3BU3RANV7TKKI2OOMRMII7YPGKOCXKHACFL
+        // 9477b807cb752af9f1e63062e6fbe75156401af3e87f71813574884f4f800ef5
+        let contractId = contractAddress
+        if (isContractHash(contractId)) {
+            contractId = getContractId(contractId)
+        }
 
-        //     if (isPreDeployed) {
-        //         return
-        //     }
+        if (!isContractId(contractId)) {
+            throw new Error("Invalid Contract ID or Contract Hash");
+        }
 
-        //     try {
-        //         logger.info("Activating Contract...")
-        //         const activationHash = await web3Hook.doActivate({ contractAddress: result.contract })
-        //         logger.success(`Contract activated successfully ${activationHash?.blockHash}`)
-        //     } catch (e: any) {
-        //         logger.warn("Contract may already be activated. Skipping activation...")
-        //         console.error(e)
-        //     }
-        // } else {
-        //     logger.error(`Error deploying contract: ${result.transactionHash}`)
-        // }
+        const result = await web3Hook.doDeploy({ contractId, deployData: "" })
+        if (result.contract) {
+            setContractAddress(result.contract)
+            logger.success(`Contract deployed at ${result.contract}`)
+
+            setContractArguments({
+                ...contractArguments,
+                [result.contract]: {},
+            })
+        } else {
+            logger.error(`Error deploying contract: ${result.transactionHash}`)
+        }
     }
     //#endregion
 
-    // //#region Params State
-    // /**
-    //  * Note we are storing constructor arguments in here as method name "constructor"
-    //  */
-    // const [contractArguments, setContractArguments] = useState<{
-    //     [contractAddress: string]: {
-    //         [method: string]: { [parameter: string]: any }
-    //     }
-    // }>({})
-    // const handleArgumentChange = (
-    //     contractAddress: string,
-    //     method: string,
-    //     name: string,
-    //     value: string
-    // ) => {
-    //     setContractArguments((prevArgs) => ({
-    //         ...prevArgs,
-    //         [contractAddress]: {
-    //             ...prevArgs[contractAddress],
-    //             [method]: {
-    //                 ...prevArgs[contractAddress]?.[method],
-    //                 [name]: value,
-    //             },
-    //         },
-    //     }))
-    // }
+    //#region Params State
+    /**
+     * Note we are storing constructor arguments in here as method name "constructor"
+     */
+    const [contractArguments, setContractArguments] = useState<{
+        [contractAddress: string]: {
+            [method: string]: { [parameter: string]: any }
+        }
+    }>({})
+    const handleArgumentChange = (
+        contractAddress: string,
+        method: string,
+        name: string,
+        value: string
+    ) => {
+        setContractArguments((prevArgs) => ({
+            ...prevArgs,
+            [contractAddress]: {
+                ...prevArgs[contractAddress],
+                [method]: {
+                    ...prevArgs[contractAddress]?.[method],
+                    [name]: value,
+                },
+            },
+        }))
+    }
 
-    // const formatParameters = (entry: AbiFunction | AbiConstructor): any[] => {
-    //     if (!entry) return []
+    const formatParameters = (entry: AbiFunction): any[] => {
+        if (!entry) return []
 
-    //     const method =
-    //         entry.type === CONSTRUCTOR_METHOD ? CONSTRUCTOR_METHOD : entry.name
-    //     const selected =
-    //         entry.type === CONSTRUCTOR_METHOD
-    //             ? CONSTRUCTOR_METHOD
-    //             : getAddress(selectedContractAddress)
+        const methodArgs = contractArguments[selectedContractAddress]?.[entry.name]
+        if (!methodArgs) return []
 
-    //     const methodArgs = contractArguments[selected]?.[method]
-    //     if (!methodArgs) return []
+        return entry.inputs.map((input: AbiParameter, index: number) => {
+            const value = methodArgs[input.name || index.toString()]
+            if (scSpecTypeToScVal(input.type.name).toLocaleLowerCase() === xdr.ScValType.scvVec().name.toLocaleLowerCase()) {
+                const items: xdr.ScVal[] = value.split(",").map((el: any) =>
+                    toScVal(el));
+                return xdr.ScVal.scvVec(items);
+            }
 
-    //     return entry.inputs.map((input: AbiParameter, index: number) =>
-    //         toNative(methodArgs[input.name || index.toString()], input)
-    //     )
-    // }
-    // //#endregion
+            return toScVal(value, input.type.name)
+        })
+    }
+    //#endregion
 
     // //#region Contract Calls
-    // const [isInvoking, setIsInvoking] = useState<boolean>(false)
+    const [isInvoking, setIsInvoking] = useState<boolean>(false)
 
-    // const initialiseInvocation = (method: string) => {
-    //     if (!selectedAbiParameter) {
-    //         throw new Error("No method selected")
-    //     }
+    const initialiseInvocation = (method: string) => {
+        if (!selectedAbiParameter) {
+            throw new Error("No method selected")
+        }
 
-    //     setIsInvoking(true)
-    //     logger.info(
-    //         <div className="flex items-center gap-2">
-    //             <ArrowRight size={18} /> <div>{method}()</div>
-    //         </div>
-    //     )
-    // }
+        setIsInvoking(true)
+        logger.info(
+            <div className="flex items-center gap-2">
+                <ArrowRight size={18} /> <div>{method}()</div>
+            </div>
+        )
+    }
 
-    // const invokeSend = async (method: string) => {
-    //     try {
-    //         initialiseInvocation(method)
+    const invokeSend = async (method: string) => {
+        try {
+            initialiseInvocation(method)
 
-    //         // This should be the transaction hash
-    //         console.log(msgValue)
-    //         const result = await web3Hook.executeSend(
-    //             selectedContractAddress,
-    //             method,
-    //             formatParameters(selectedAbiParameter!),
-    //             msgValue
-    //         )
-    //         const tx = result.toString()
+            // This should be the transaction hash
+            console.log(msgValue)
+            const result = await web3Hook.executeSend(
+                selectedContractAddress,
+                method,
+                formatParameters(selectedAbiParameter!),
+                msgValue
+            )
+            const tx = result.toString()
 
-    //         // formatOutput(selectedAbiParameter, result)
-    //         const hex = await window.ethereum.request({ method: "eth_chainId" })
-    //         const chainId = parseInt(hex, 16).toString()
-    //         const txExplorer = getTransactionExplorer(chainId, tx)
-    //         if (txExplorer) {
-    //             logger.success(
-    //                 <a className="underline" href={txExplorer} target="_blank">
-    //                     {tx}
-    //                 </a>
-    //             )
-    //         } else {
-    //             logger.success(tx)
-    //         }
-    //     } catch (error: any) {
-    //         logger.error(handleError(error), true)
-    //     } finally {
-    //         setSelectedAbiParameter(null)
-    //         setIsInvoking(false)
-    //     }
-    // }
+            // formatOutput(selectedAbiParameter, result)
+            const hex = await window.ethereum.request({ method: "eth_chainId" })
+            const chainId = parseInt(hex, 16).toString()
+            const txExplorer = getTransactionExplorer(chainId, tx)
+            if (txExplorer) {
+                logger.success(
+                    <a className="underline" href={txExplorer} target="_blank">
+                        {tx}
+                    </a>
+                )
+            } else {
+                logger.success(tx)
+            }
+        } catch (error: any) {
+            logger.error(handleError(error), true)
+        } finally {
+            setSelectedAbiParameter(null)
+            setIsInvoking(false)
+        }
+    }
 
-    // const invokeCall = async (method: string) => {
-    //     try {
-    //         initialiseInvocation(method)
+    const invokeCall = async (method: string) => {
+        try {
+            initialiseInvocation(method)
 
-    //         // This should be the transaction hash
-    //         const result = await web3Hook.executeCall(
-    //             selectedContractAddress,
-    //             method,
-    //             formatParameters(selectedAbiParameter!)
-    //         )
+            // This should be the transaction hash
+            const args = formatParameters(selectedAbiParameter!)
+            console.log(args)
+            // const result = await web3Hook.executeCall(
+            //     selectedContractAddress,
+            //     method,
+            //     formatParameters(selectedAbiParameter!)
+            // )
 
-    //         formatOutput(selectedAbiParameter!, result)
-    //     } catch (error: any) {
-    //         logger.error(handleError(error), true)
-    //     } finally {
-    //         setSelectedAbiParameter(null)
-    //         setIsInvoking(false)
-    //     }
-    // }
+            // formatOutput(selectedAbiParameter!, result)
+        } catch (error: any) {
+            logger.error(handleError(error), true)
+        } finally {
+            setSelectedAbiParameter(null)
+            setIsInvoking(false)
+        }
+    }
 
-    // const formatOutput = (entry: AbiFunction, result: any) => {
-    //     // console.log("formatOutput", entry, result)
-    //     if (entry.outputs && entry.outputs.length > 0) {
-    //         if (typeof result === "object") {
-    //             result = JSON.stringify(result, (_, v) =>
-    //                 typeof v === "bigint" ? v.toString() : v
-    //             )
-    //         } else if (entry.outputs[0].type.includes("int")) {
-    //             result = result.toString() as BigInt
-    //         } else {
-    //             result = result as string
-    //         }
+    const formatOutput = (entry: AbiFunction, result: any) => {
+        // console.log("formatOutput", entry, result)
+        if (entry.outputs && entry.outputs.length > 0) {
+            // if (typeof result === "object") {
+            //     result = JSON.stringify(result, (_, v) =>
+            //         typeof v === "bigint" ? v.toString() : v
+            //     )
+            // } else if (entry.outputs[0].type.includes("int")) {
+            //     result = result.toString() as BigInt
+            // } else {
+            //     result = result as string
+            // }
 
-    //         logger.info(
-    //             <div className="flex items-center gap-2">
-    //                 <ArrowLeft size={18} /> <div>{result}</div>
-    //             </div>
-    //         )
-    //         setRet({ ...ret, [entry.name]: result })
-    //     } else {
-    //         logger.success(result)
-    //         setRet({ ...ret, [entry.name]: result })
-    //     }
-    // }
+            logger.info(
+                <div className="flex items-center gap-2">
+                    <ArrowLeft size={18} /> <div>{result}</div>
+                </div>
+            )
+            setRet({ ...ret, [entry.name]: result })
+        } else {
+            logger.success(result)
+            setRet({ ...ret, [entry.name]: result })
+        }
+    }
     // //#endregion
 
-    // const handleError = (error: any) => {
-    //     let msg = error && error.toString()
-    //     if (typeof error === "object") {
-    //         msg = error?.message.toString() || "Error deploying contract"
-    //     }
+    const handleError = (error: any) => {
+        let msg = error && error.toString()
+        if (typeof error === "object") {
+            msg = error?.message.toString() || "Error deploying contract"
+        }
 
-    //     return `${msg.toString()}`
-    // }
+        return `${msg.toString()}`
+    }
 
-    // const [selectedContractAddress, setSelectedContractAddress] =
-    //     useState<string>("")
-    // const [selectedAbiParameter, setSelectedAbiParameter] =
-    //     useState<AbiFunction | null>(null)
+    const [selectedContractAddress, setSelectedContractAddress] =
+        useState<string>("")
+    const [selectedAbiParameter, setSelectedAbiParameter] =
+        useState<AbiFunction | null>(null)
 
     // const [selectedConstructor, setSelectedConstructor] =
     //     useState<AbiConstructor | null>(null)
 
-    // const handleRemoveContract = (contractAddress: string) => {
-    //     web3Hook.removeContract(contractAddress)
-    // }
+    const handleRemoveContract = (contractAddress: string) => {
+        web3Hook.removeContract(contractAddress)
+    }
+
     return <div>
-        <CollapsibleChevron>
-            {/* <ConnectButton /> */}
-            <textarea value={abi} onChange={(e) => setABI(e.target.value)}>
-
-            </textarea>
-        </CollapsibleChevron>
-
+        <div className="flex items-center justify-center my-2">
+            <ConnectWallet />
+        </div>
         <div className="flex">
             <Button
                 size="sm"
@@ -307,7 +307,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
             />
         </div>
 
-        {/* <Title text="Deployed Contracts" />
+        <Title text="Deployed Contracts" />
         {Object.entries(web3Hook.contracts).map(([key, val], index) => {
             return (
                 <CollapsibleChevron
@@ -315,6 +315,9 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                     name={key}
                     onClosed={() => handleRemoveContract(key)}
                 >
+                    <div>
+                        {val.wasmHash}
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         {(val.abi as Abi)
                             .filter((abi) => abi.type === "function")
@@ -347,9 +350,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
             <DialogContent className="max-h-[80vh] overflow-auto">
                 <DialogHeader>
                     <DialogTitle>
-                        {selectedAbiParameter?.name || "Unknown"} (
-                        {selectedAbiParameter && toFunctionSelector(selectedAbiParameter)}
-                        )
+                        {selectedAbiParameter?.name || "Unknown"}
                     </DialogTitle>
                     <DialogDescription></DialogDescription>
                 </DialogHeader>
@@ -371,7 +372,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                                                 selectedAbiParameter.name
                                                 ]?.[input.name || abiIndex.toString()]
                                             }
-                                            placeholder={input.type}
+                                            placeholder={scSpecTypeToScVal(input.type.name)}
                                             onChange={(e) =>
                                                 handleArgumentChange(
                                                     selectedContractAddress,
@@ -388,7 +389,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
 
                         <Button
                             onClick={() => {
-                                if (selectedAbiParameter.stateMutability === "view") {
+                                if (selectedAbiParameter.outputs?.length >= 0) {
                                     invokeCall(selectedAbiParameter.name)
                                     return
                                 } else {
@@ -399,7 +400,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                         >
                             {isInvoking
                                 ? "Invoking..."
-                                : selectedAbiParameter.stateMutability === "view"
+                                : selectedAbiParameter.outputs?.length >= 0
                                     ? "Call"
                                     : "Send"}
                         </Button>
@@ -407,7 +408,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                 )}
             </DialogContent>
         </Dialog>
-
+        {/*
         <Dialog
             open={!!selectedConstructor}
             onOpenChange={() => {

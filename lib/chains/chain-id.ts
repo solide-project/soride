@@ -1,5 +1,5 @@
 export enum ChainID {
-    STELLAR_MAINNET = "1500",
-    STELLAR_TESTNET = "1501",
-    STELLAR_FUTURENET = "1502",
+    STELLAR_MAINNET = "public",
+    STELLAR_TESTNET = "testnet",
+    STELLAR_FUTURENET = "futurenet",
 }

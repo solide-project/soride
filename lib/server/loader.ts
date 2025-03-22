@@ -1,23 +1,22 @@
 
 import { ContractPaths, ContractDependency } from "@/lib/core"
 import { fetchGithubAPI, fetchGithubSource, parseGitHubUrl } from "./utils"
-import path from "path"
 
 /**
  * Main function to get the solidity contract source code
  * @param url
  * @returns
  */
-export const getStylusContract = async (url: string) => {
+export const getSorobanContract = async (url: string) => {
     try {
-        const loader = new StylusLoader(url)
+        const loader = new SorobanLoader(url)
         return await loader.generateSource()   
     } catch (e: any) {
         return e.message.toString()
     }
 }
 
-class StylusLoader {
+class SorobanLoader {
     source: string
     constructor(source: string) {
         this.source = source
@@ -35,7 +34,7 @@ class StylusLoader {
         const isValidProject = tomlFile && sourcesFolder
 
         if (!isValidProject) {
-            return "Invalid Stylus Project"
+            return "Invalid Soroban Project"
         }
 
         const tomlContent = await fetchGithubSource(tomlFile?.html_url)
@@ -72,7 +71,7 @@ class StylusLoader {
         }
 
         return {
-            language: "Stylus",
+            language: "Soroban",
             settings: {
                 compilationTarget: {
                     [tomlFile.path]: "Cargo.toml"

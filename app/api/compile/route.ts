@@ -1,7 +1,7 @@
 import path from "path"
 import fs from "fs"
 import { NextRequest, NextResponse } from "next/server"
-import { compile } from "@/lib/stylus/compiler";
+import { compile } from "@/lib/soroban/compiler";
 import stripAnsi from "strip-ansi";
 import toml from "toml";
 import JSZip from "jszip";

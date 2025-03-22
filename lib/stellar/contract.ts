@@ -1,16 +1,31 @@
+import { rpc } from "@stellar/stellar-sdk"
 import { ISmartContract, InvokeParam } from "./interfaces"
+import { SorosanContract } from "./soroban-contract"
 
 export class SorobanSmartContract implements ISmartContract {
-    contractAddress: `${string}.${string}`
-    chainId: any
-
+    contractAddress: string
+    server: rpc.Server
     abi: any
 
-    constructor(address: string, chainId: string) {
-        this.contractAddress = address as `${string}.${string}`;
-        this.chainId = chainId;
+    sorobanContract: SorosanContract
+    wasmHash: string
+    wasmCode: string
 
-        this.abi = {} as any;
+    constructor(address: string, server: rpc.Server) {
+        this.contractAddress = address;
+        this.server = server;
+
+        this.sorobanContract = new SorosanContract(address);
+        this.abi = []
+        this.wasmHash = ""
+        this.wasmCode = ""
+    }
+
+    async init() {
+        const { code, wasmId, abi } = await this.sorobanContract.getContractInfo(this.server);
+        this.wasmCode = code
+        this.wasmHash = wasmId.toString('hex')
+        this.abi = abi
     }
 
     async call({ method, args }: InvokeParam): Promise<any> {
@@ -28,4 +43,3 @@ export class SorobanSmartContract implements ISmartContract {
     }: InvokeParam): Promise<any> {
     }
 }
-

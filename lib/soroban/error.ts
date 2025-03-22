@@ -1,4 +1,4 @@
-export interface StylusError {
+export interface SorobanError {
     component: string
     errorCode: string
     formattedMessage: string
@@ -9,5 +9,5 @@ export interface StylusError {
 }
 
 export interface CompileError {
-    details: StylusError[]
+    details: SorobanError[]
 }

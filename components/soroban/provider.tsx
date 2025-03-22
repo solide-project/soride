@@ -1,8 +1,10 @@
 "use client"
 
-import { CompileError } from "@/lib/stylus"
+import { ChainID } from "@/lib/chains"
+import { getServer } from "@/lib/stellar/server"
+import { CompileError } from "@/lib/soroban"
+import { rpc } from "@stellar/stellar-sdk"
 import React, { createContext, useContext, useEffect, useState } from "react"
-
 
 export const SorobanProvider = ({ children }: SorobanProviderProps) => {
     const [tomlPath, setTomlPath] = useState<string>("")
@@ -13,8 +15,12 @@ export const SorobanProvider = ({ children }: SorobanProviderProps) => {
     const [wasm, setWasm] = useState<Blob>({} as Blob)
     const [deployData, setDeployData] = useState<string>("")
 
+    const [selectedNetwork, setSelectedNetwork] = useState<string>(ChainID.STELLAR_TESTNET)
+    const [networkServer, setNetworkServer] = useState<rpc.Server>(getServer(selectedNetwork))
+
     useEffect(() => {
-    }, [])
+        setNetworkServer(getServer(selectedNetwork))
+    }, [selectedNetwork])
 
     const resetBuild = () => {
         setErrors({} as CompileError)
@@ -35,7 +41,11 @@ export const SorobanProvider = ({ children }: SorobanProviderProps) => {
                 setABI,
                 errors,
                 setErrors,
-                resetBuild
+                resetBuild,
+                selectedNetwork,
+                setSelectedNetwork,
+                networkServer,
+                setNetworkServer,
             }}
         >
             {children}
@@ -49,16 +59,21 @@ interface SorobanProviderProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const SorobanContext = createContext({
     tomlPath: "",
-    setTomlPath: (path: string) => { },
+    setTomlPath: (_: string) => { },
     wasm: {} as Blob,
-    setWasm: (wasm: Blob) => { },
+    setWasm: (_: Blob) => { },
     deployData: "",
-    setDeployData: (data: string) => { },
+    setDeployData: (_: string) => { },
     abi: "",
-    setABI: (abi: string) => { },
+    setABI: (_: string) => { },
     errors: {} as CompileError,
-    setErrors: (errors: CompileError) => { },
-    resetBuild: () => { }
+    setErrors: (_: CompileError) => { },
+    resetBuild: () => { },
+    selectedNetwork: "",
+    setSelectedNetwork: (_: string) => { },
+    networkServer: {} as rpc.Server,
+    setNetworkServer: (_: rpc.Server) => { },
+
 })
 
 export const useProgram = () => useContext(SorobanContext)

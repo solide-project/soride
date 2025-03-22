@@ -9,53 +9,56 @@ import { useProgram } from "@/components/soroban/provider"
 import { ContractInvoke } from "@/components/soroban/deploy/contract-invoke"
 import { CompileErrors } from "@/components/soroban/deploy/compile-errors"
 import { ContractOverview } from "@/components/soroban/deploy/contract-overview"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 interface BuildDeployProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 enum Tab {
-    OVERVIEW = "overview",
-    INTERACT = "interact",
+    OVERVIEW = "Overview",
+    INTERACT = "Interact",
 }
 
+const tabsData = [
+    { key: Tab.OVERVIEW, component: <ContractOverview /> },
+    { key: Tab.INTERACT, component: <ContractInvoke /> },
+]
+
 export function BuildDeploy({ className }: BuildDeployProps) {
-    const stylus = useProgram()
-
+    const soroban = useProgram()
     const [activeTab, setActiveTab] = useState<Tab>(Tab.INTERACT)
-    const isActive = (tab: string) => activeTab === tab
 
-    const tabActive = (tab: string): string =>
-        cn("cursor-pointer", {
-            "text-grayscale-250": !isActive(tab),
-            "bg-grayscale-200 rounded-lg px-3 py-1": isActive(tab),
-        })
+    const isActive = (tab: string) => activeTab === tab
 
     return (
         <div className={cn("px-2 pb-4", className)}>
             <Title text="Build & Deploy" />
 
-            {stylus.errors && stylus.errors.details && <CompileErrors />}
+            {soroban.errors && soroban.errors.details && <CompileErrors />}
 
-            <div className="mx-2 my-4 flex items-center gap-x-4 text-sm">
-                <div
-                    className={tabActive(Tab.OVERVIEW)}
-                    onClick={() => setActiveTab(Tab.OVERVIEW)}
-                >
-                    Overview
-                </div>
-                <div
-                    className={tabActive(Tab.INTERACT)}
-                    onClick={() => setActiveTab(Tab.INTERACT)}
-                >
-                    Contract
-                </div>
-            </div>
+            <Select onValueChange={(val: string) => setActiveTab(val as Tab)}>
+                <SelectTrigger className="w-full mb-2 bg-transparent border-none font-bold flex items-center justify-center space-x-4">
+                    <SelectValue placeholder="Theme" />
+                </SelectTrigger>
+                <SelectContent>
+                    {tabsData.map(x => x.key).map((tab, index) => (
+                        <SelectItem key={index} value={tab}>{tab}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
 
-            {isActive(Tab.OVERVIEW) &&
-                stylus.deployData && <ContractOverview />}
-
-            {isActive(Tab.INTERACT) &&
-                stylus.deployData && <ContractInvoke />}
-
+            {tabsData.map((data) => {
+                return (
+                    <div key={data.key} className={cn({ hidden: !isActive(data.key) })}>
+                        {data.component}
+                    </div>
+                )
+            })}
         </div>
     )
 }

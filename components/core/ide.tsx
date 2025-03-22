@@ -6,8 +6,8 @@ import { VFSFile } from "@/lib/core"
 import { useEditor } from "@/components/core/providers/editor-provider"
 import { useFileSystem } from "@/components/core/providers/file-provider"
 import path from "path"
-import { MonarchDefinitions } from "@/lib/monaco/stylus/language"
-import { getRustCompletion, getStylusCompletion } from "@/lib/monaco/stylus/completion"
+import { MonarchDefinitions } from "@/lib/monaco/soroban/language"
+import { getRustCompletion, getSorobanCompletion } from "@/lib/monaco/soroban/completion"
 
 interface IDEProps extends React.HTMLAttributes<HTMLDivElement> {
   defaultLanguage?: string
@@ -94,7 +94,7 @@ export function IDE({ defaultLanguage = "rust" }: IDEProps) {
           return {
             suggestions: [
               ...getRustCompletion(range, monaco),
-              ...getStylusCompletion(range, monaco),
+              ...getSorobanCompletion(range, monaco),
             ],
           }
         },

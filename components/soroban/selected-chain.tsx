@@ -1,30 +1,41 @@
 "use client"
 
-import * as React from "react"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
-import { getIconByChainId, getNetworkNameFromChainID } from "@/lib/chains"
+import { ChainID, getIconByChainId, getNetworkNameFromChainID } from "@/lib/chains"
 
 import { SelectedChain } from "@/components/core/components/selected-chain"
+import { WatchWalletChanges } from "@stellar/freighter-api"
+import { useProgram } from "./provider"
+import { useTheme } from "next-themes"
 
-export const hexToDecimal = (hex: string): number => parseInt(hex, 16)
-export const hexToString = (hex: string): string => hexToDecimal(hex).toString()
+interface SorobanSelectedChainProps extends React.HTMLAttributes<HTMLDivElement> { }
 
-interface StylusSelectedChainProps extends React.HTMLAttributes<HTMLDivElement> { }
+export function SorobanSelectedChain({ }: SorobanSelectedChainProps) {
+    const { setSelectedNetwork } = useProgram();
+    const { theme } = useTheme()
+    const [chainId, setChainId] = useState(ChainID.STELLAR_TESTNET);
 
-export function StylusSelectedChain({ }: StylusSelectedChainProps) {
-    const [chainId, setChainId] = useState<string>("1501")
+    const Watcher = new WatchWalletChanges(1000);
+    const watcherRef = useRef(Watcher);
 
     useEffect(() => {
-        ; (async () => {
-
-        })()
+        watcherRef.current.watch((result) => {
+            let chainId = ChainID.STELLAR_TESTNET
+            if (result.network === "TESTNET") {
+                chainId = ChainID.STELLAR_TESTNET
+            } else if (result.network === "PUBLIC") {
+                chainId = ChainID.STELLAR_MAINNET
+            }
+            setChainId(chainId);
+            setSelectedNetwork(chainId)
+        });
     }, [])
 
     return (
         <SelectedChain
             name={getNetworkNameFromChainID(chainId)}
-            src={getIconByChainId(chainId)}
+            src={getIconByChainId(chainId, theme)}
         />
     )
 }

@@ -11,6 +11,12 @@ export interface InvokeParam {
 }
 
 export interface ISmartContract {
+    /**
+     * Specific soroban
+     */
+    wasmHash: string;
+    wasmCode: string;
+
     contractAddress: string
     abi: any
     call(args: InvokeParam): Promise<any>

@@ -1,41 +1,29 @@
-
 [package]
-name = "stylus-hello-world"
-version = "0.1.9"
+name = "soroban-increment-contract"
+version = "0.0.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
-homepage = "https://github.com/OffchainLabs/stylus-hello-world"
-repository = "https://github.com/OffchainLabs/stylus-hello-world"
-keywords = ["arbitrum", "ethereum", "stylus", "alloy"]
-description = "Stylus hello world example"
-
-[dependencies]
-alloy-primitives = "=0.7.6"
-alloy-sol-types = "=0.7.6"
-mini-alloc = "0.4.2"
-stylus-sdk = "0.6.0"
-hex = "0.4.3"
-dotenv = "0.15.0"
-
-[dev-dependencies]
-tokio = { version = "1.12.0", features = ["full"] }
-ethers = "2.0"
-eyre = "0.6.8"
-
-[features]
-export-abi = ["stylus-sdk/export-abi"]
-debug = ["stylus-sdk/debug"]
-
-[[bin]]
-name = "stylus-hello-world"
-path = "src/main.rs"
+publish = false
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { version = "22.0.7" }
+
+[dev-dependencies]
+soroban-sdk = { version = "22.0.7", features = ["testutils"] }
 
 [profile.release]
-codegen-units = 1
-strip = true
-lto = true
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
 panic = "abort"
-opt-level = "s"
+codegen-units = 1
+lto = true
+
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true

@@ -26,10 +26,12 @@ import { BuildDeploy } from "@/components/soroban/deploy/build-deploy"
 import { useProgram } from "@/components/soroban/provider"
 import { SorobanNavBar } from "@/components/soroban/navbar"
 import { QueryHelper } from "@/lib/core"
-import { CompileError, CompileInput, parseInput } from "@/lib/stylus"
+import { CompileError, CompileInput, parseInput } from "@/lib/soroban"
 import { FileTree } from "@/components/core/file-tree"
 import JSZip from "jszip"
 import { PROJECT_NAME } from "@/lib/core/config"
+import { UtiltyTab } from "./utils"
+import { UTILITY_KEY } from "./navbar/nav-item-utilty"
 
 export const hexToDecimal = (hex: string): number => parseInt(hex, 16)
 
@@ -59,7 +61,7 @@ export function SorobanIDE({
     const fs = useFileSystem()
     const ide = useEditor()
     const logger = useLogger()
-    const stylus = useProgram()
+    const soroban = useProgram()
 
     const { setNavItemActive, isNavItemActive } = useNav()
 
@@ -75,7 +77,7 @@ export function SorobanIDE({
                 .filter(i => i.toLocaleLowerCase().includes("cargo.toml"))
                 .pop()
             if (entry) {
-                stylus.setTomlPath(entry)
+                soroban.setTomlPath(entry)
             }
 
             const entryFile = await fs.initAndFoundEntry(input.sources, title || "Cargo.toml")
@@ -108,11 +110,11 @@ export function SorobanIDE({
     }
 
     const doCompile = async () => {
-        stylus.resetBuild()
+        soroban.resetBuild()
         let queryBuilder = new QueryHelper()
 
-        if (stylus.tomlPath) {
-            queryBuilder = queryBuilder.addParam("toml", stylus.tomlPath)
+        if (soroban.tomlPath) {
+            queryBuilder = queryBuilder.addParam("toml", soroban.tomlPath)
         }
 
         const sources = fs.generateSources()
@@ -126,7 +128,7 @@ export function SorobanIDE({
 
         if (!response.ok) {
             const data = (await response.json()) as CompileError
-            stylus.setErrors(data)
+            soroban.setErrors(data)
 
             logger.error(`Compiled with ${data.details.length} errors.`, true)
             return
@@ -144,7 +146,7 @@ export function SorobanIDE({
 
             if (file.name.endsWith('.wasm')) {
                 const wasmContent: ArrayBuffer = await file.async('arraybuffer');
-                stylus.setWasm(new Blob([wasmContent], { type: "application/wasm" }))
+                soroban.setWasm(new Blob([wasmContent], { type: "application/wasm" }))
 
                 // console.log(wasmContent)
             }
@@ -156,10 +158,10 @@ export function SorobanIDE({
 
                 logger.info(`Contract Size: ${output.size}`)
                 logger.info(`WASM Size: ${output.wasm}`)
-                stylus.setDeployData(output.data)
+                soroban.setDeployData(output.data)
 
                 if (output.abi) {
-                    stylus.setABI(output.abi)
+                    soroban.setABI(output.abi)
                 }
             }
         });
@@ -181,15 +183,15 @@ export function SorobanIDE({
                 })}
             >
                 <div className="flex max-h-screen w-full flex-col gap-y-2 overflow-y-auto p-2">
-                    {isNavItemActive(FILE_KEY) && (
-                        <FileTree className="rounded-lg bg-grayscale-025 pb-4" />
-                    )}
-                    {isNavItemActive(CODE_KEY) && (
+                    <div className={cn({ hidden: !isNavItemActive(FILE_KEY) })}>
+                        <FileTree className="rounded-lg bg-grayscale-025" />
+                    </div>
+                    <div className={cn({ hidden: !isNavItemActive(CODE_KEY) })}>
                         <BuildDeploy className="rounded-lg bg-grayscale-025" />
-                    )}
-                    {/* {isNavItemActive(UTILITY_KEY) && (
-                            <UtiltyTab className="rounded-lg bg-grayscale-025" />
-                        )} */}
+                    </div>
+                    <div className={cn({ hidden: !isNavItemActive(UTILITY_KEY) })}>
+                        <UtiltyTab className="rounded-lg bg-grayscale-025" />
+                    </div>
                 </div>
             </ResizablePanel>
             {(isNavItemActive(FILE_KEY) || isNavItemActive(CODE_KEY)) && (
