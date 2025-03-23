@@ -17,51 +17,17 @@ export class SorosanContract extends Contract {
         );
     }
 
-    /**
-     * Retrieves the WebAssembly (Wasm) ID of the contract from the Soroban RPC server.
-     *
-     * This method fetches the Wasm ID of the contract from the Soroban RPC server
-     * using the provided server instance.
-     *
-     * @param {rpc.Server} server - The Soroban RPC server instance from which to fetch the Wasm ID.
-     * @returns {Promise<Buffer>} - A promise that resolves to the Wasm ID of the contract.
-     * 
-     * @example
-     * const server: rpc.Server;
-     * const contractAddress: string;
-     * const contract = new SorosanContract(contractAddress);
-     * const wasmId = await contract.wasmId(server);
-     * console.log(`Wasm ID: ${wasmId.toString('hex')}`);
-     */
     async wasmId(server: rpc.Server): Promise<Buffer> {
         const ledgerEntry = await this.ledgerEntry(server)
         if (!ledgerEntry) {
             return Buffer.from([]);
         }
 
-        // const codeData = xdr.LedgerEntryData
-        //     .fromXDR(ledgerEntry.xdr, 'base64')
-        //     .contractData();
         const codeData = ledgerEntry.val.contractData();
         const contractInstance = codeData.val().instance();
         return contractInstance.executable().wasmHash();
     }
 
-    /**
-     * Retrieves the last modified ledger sequence number associated with the WebAssembly (Wasm) ID of the contract from the Soroban RPC server.
-     *
-     * This method fetches the last modified ledger sequence number associated with the Wasm ID of the contract from the Soroban RPC server
-     * using the provided server instance.
-     *
-     * @param {rpc.Server} server - The Soroban RPC server instance from which to fetch the last modified ledger sequence number.
-     * @returns {Promise<number>} - A promise that resolves to the last modified ledger sequence number associated with the Wasm ID of the contract.
-     * 
-     * @example
-     * const server: rpc.Server;
-     * const contract: string;
-     * const ledgerSeq = await contract.wasmIdLedgerSeq(server);
-     * console.log(`Last modified ledger sequence number: ${ledgerSeq}`);
-     */
     async wasmIdLedgerSeq(server: rpc.Server): Promise<number> {
         const ledgerEntry = await this.ledgerEntry(server)
         if (!ledgerEntry) {
@@ -71,21 +37,6 @@ export class SorosanContract extends Contract {
         return ledgerEntry.lastModifiedLedgerSeq || 0;
     }
 
-    /**
-     * Retrieves the storage elements associated with the contract from the Soroban RPC server.
-     *
-     * This method fetches the storage elements associated with the contract from the Soroban RPC server
-     * using the provided server instance.
-     *
-     * @param {rpc.Server} server - The Soroban RPC server instance from which to fetch the storage elements.
-     * @returns {Promise<ReadonlyArray<StorageElement>>} - A promise that resolves to an array of storage elements associated with the contract.
-     * 
-     * @example
-     * const server: rpc.Server;
-     * const contract: string;
-     * const storageElements = await contract.storage(server);
-     * console.log('Storage elements:', storageElements);
-     */
     async storage(server: rpc.Server): Promise<ReadonlyArray<StorageElement>> {
         const ledgerEntry = await this.ledgerEntry(server)
         if (!ledgerEntry) {
@@ -99,63 +50,11 @@ export class SorosanContract extends Contract {
 
     }
 
-    /**
-     * Retrieves the contract code associated with the contract from the Soroban RPC server.
-     *
-     * This method fetches the contract code associated with the contract from the Soroban RPC server
-     * using the provided server instance.
-     *
-     * @param {rpc.Server} server - The Soroban RPC server instance from which to fetch the contract code.
-     * @returns {Promise<string>} - A promise that resolves to the contract code associated with the contract.
-     * 
-     * @example
-     * const server: rpc.Server;
-     * const contract: string;
-     * const code = await contract.code(server);
-     * console.log('Contract code:', code);
-     */
     async code(server: rpc.Server): Promise<string> {
         const wasmId = await this.wasmId(server);
-        return await this._code(server, wasmId);
+        return await _code(server, wasmId);
     }
 
-    private async _code(server: rpc.Server, wasmId: Buffer) {
-        const ledgerKey = xdr.LedgerKey.contractCode(
-            new xdr.LedgerKeyContractCode({
-                hash: wasmId
-            })
-        );
-
-        const ledgerEntries = await server.getLedgerEntries(ledgerKey);
-
-        if (ledgerEntries == null || ledgerEntries.entries == null) {
-            return "";
-        }
-
-        const ledgerEntry = ledgerEntries.entries[0] as rpc.Api.LedgerEntryResult;
-        const ledgerSeq = ledgerEntry.lastModifiedLedgerSeq as number;
-        // const codeEntry = xdr.LedgerEntryData.fromXDR(ledgerEntry.xdr, 'base64');
-        const codeEntry = ledgerEntry.val;
-        const code = codeEntry.contractCode().code().toString('hex');
-
-        return code;
-    }
-
-    /**
-     * Retrieves the last modified ledger sequence number associated with the contract code from the Soroban RPC server.
-     *
-     * This method fetches the last modified ledger sequence number associated with the contract code from the Soroban RPC server
-     * using the provided server instance.
-     *
-     * @param {rpc.Server} server - The Soroban RPC server instance from which to fetch the last modified ledger sequence number.
-     * @returns {Promise<number>} - A promise that resolves to the last modified ledger sequence number associated with the contract code.
-     * 
-     * @example
-     * const server: rpc.Server;
-     * const contract: string;
-     * const ledgerSeq = await contract.wasmCodeLedgerSeq(server);
-     * console.log(`Last modified ledger sequence number: ${ledgerSeq}`);
-     */
     async wasmCodeLedgerSeq(server: rpc.Server): Promise<number> {
         const wasmId = await this.wasmId(server);
         const ledgerKey = xdr.LedgerKey.contractCode(
@@ -178,56 +77,12 @@ export class SorosanContract extends Contract {
         server: rpc.Server,
     ): Promise<xdr.ScSpecEntry[]> {
         const code = await this.code(server);
-        return await this._specs(code);
-    }
-
-    private async _specs(code: string) {
-        const buffer = Buffer.from(code || "", "hex");
-
-        const executable = new WebAssembly.Module(buffer);
-        const contractSpecificationSection = WebAssembly.Module.customSections(executable, 'contractspecv0');
-        let totalEntries: xdr.ScSpecEntry[] = [];
-        for (const item of contractSpecificationSection) {
-            const entries = await decodeContractSpecBuffer(item);
-
-            entries.forEach((entry: xdr.ScSpecEntry) => {
-                totalEntries.push(entry);
-            });
-        }
-        return totalEntries;
+        return await _specs(code);
     }
 
     async abi(server: rpc.Server) {
         const entries = await this.specs(server);
-        return this._abi(entries);
-    }
-
-    private async _abi(entries: xdr.ScSpecEntry[]) {
-        let abi: (AbiFunction | AbiConstructor)[] = [];
-        entries.forEach((entry: xdr.ScSpecEntry) => {
-            if (entry.switch() === xdr.ScSpecEntryKind.scSpecEntryFunctionV0()) {
-                const functionV0 = entry.value() as xdr.ScSpecFunctionV0;
-                const name = functionV0.name().toString();
-                const doc = functionV0.doc().toString();
-                let type: AbiItemType = "function"
-                if (name === "__constructor") {
-                    type = "constructor"
-                }
-
-                const inputs = functionV0.inputs().map((input: xdr.ScSpecFunctionInputV0) => ({
-                    doc: input.doc().toString(),
-                    name: input.name().toString(),
-                    type: input.type().switch()
-                }));
-
-                const outputs = functionV0.outputs().map((output: xdr.ScSpecTypeDef) => ({
-                    type: output.switch()
-                }));
-
-                abi.push({ doc, type, name, inputs, outputs });
-            }
-        });
-        return abi as Abi
+        return _abi(entries);
     }
 
     private convertStorage = (
@@ -266,9 +121,9 @@ export class SorosanContract extends Contract {
         abi: any
     }> {
         const wasmId = await this.wasmId(server);
-        const code = await this._code(server, wasmId);
-        const specs = await this._specs(code);
-        const abi = await this._abi(specs);
+        const code = await _code(server, wasmId);
+        const specs = await _specs(code);
+        const abi = await _abi(specs);
         return { code, wasmId, abi };
     }
 }
@@ -278,4 +133,70 @@ export interface StorageElement {
     keyType: string
     value: string
     valueType: string
+}
+
+export const _code = async (server: rpc.Server, wasmId: Buffer) => {
+    const ledgerKey = xdr.LedgerKey.contractCode(
+        new xdr.LedgerKeyContractCode({
+            hash: wasmId
+        })
+    );
+
+    const ledgerEntries = await server.getLedgerEntries(ledgerKey);
+
+    if (ledgerEntries == null || ledgerEntries.entries == null) {
+        return "";
+    }
+
+    const ledgerEntry = ledgerEntries.entries[0] as rpc.Api.LedgerEntryResult;
+    const ledgerSeq = ledgerEntry.lastModifiedLedgerSeq as number;
+    // const codeEntry = xdr.LedgerEntryData.fromXDR(ledgerEntry.xdr, 'base64');
+    const codeEntry = ledgerEntry.val;
+    const code = codeEntry.contractCode().code().toString('hex');
+
+    return code;
+}
+
+export const _specs = async (code: string) => {
+    const buffer = Buffer.from(code || "", "hex");
+
+    const executable = new WebAssembly.Module(buffer);
+    const contractSpecificationSection = WebAssembly.Module.customSections(executable, 'contractspecv0');
+    let totalEntries: xdr.ScSpecEntry[] = [];
+    for (const item of contractSpecificationSection) {
+        const entries = await decodeContractSpecBuffer(item);
+
+        entries.forEach((entry: xdr.ScSpecEntry) => {
+            totalEntries.push(entry);
+        });
+    }
+    return totalEntries;
+}
+
+export const _abi = async (entries: xdr.ScSpecEntry[]) => {
+    let abi: (AbiFunction | AbiConstructor)[] = [];
+    entries.forEach((entry: xdr.ScSpecEntry) => {
+        if (entry.switch() === xdr.ScSpecEntryKind.scSpecEntryFunctionV0()) {
+            const functionV0 = entry.value() as xdr.ScSpecFunctionV0;
+            const name = functionV0.name().toString();
+            const doc = functionV0.doc().toString();
+            let type: AbiItemType = "function"
+            if (name === "__constructor") {
+                type = "constructor"
+            }
+
+            const inputs = functionV0.inputs().map((input: xdr.ScSpecFunctionInputV0) => ({
+                doc: input.doc().toString(),
+                name: input.name().toString(),
+                type: input.type().switch()
+            }));
+
+            const outputs = functionV0.outputs().map((output: xdr.ScSpecTypeDef) => ({
+                type: output.switch()
+            }));
+
+            abi.push({ doc, type, name, inputs, outputs });
+        }
+    });
+    return abi as Abi
 }

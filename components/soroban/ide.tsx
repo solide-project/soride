@@ -121,7 +121,8 @@ export function SorobanIDE({
         const source: any = { sources }
         const body = { input: source }
 
-        const response = await fetch(`/api/compile${queryBuilder.build()}`, {
+        // const response = await fetch(`/api/compile${queryBuilder.build()}`, {
+        const response = await fetch(`/api/precompile`, {
             method: "POST",
             body: JSON.stringify(body),
         })
@@ -142,27 +143,9 @@ export function SorobanIDE({
         const zip = new JSZip()
         const zipContent = await zip.loadAsync(data)
         zipContent.forEach(async (relativePath, file) => {
-            // console.log('Found file:', relativePath);
-
             if (file.name.endsWith('.wasm')) {
                 const wasmContent: ArrayBuffer = await file.async('arraybuffer');
                 soroban.setWasm(new Blob([wasmContent], { type: "application/wasm" }))
-
-                // console.log(wasmContent)
-            }
-
-            if (file.name.endsWith('.json')) {
-                const textContent = await file.async('string');
-                const output = JSON.parse(textContent);
-                // console.log(output)
-
-                logger.info(`Contract Size: ${output.size}`)
-                logger.info(`WASM Size: ${output.wasm}`)
-                soroban.setDeployData(output.data)
-
-                if (output.abi) {
-                    soroban.setABI(output.abi)
-                }
             }
         });
     }
@@ -211,7 +194,7 @@ export function SorobanIDE({
                                 <IDEHeader />
                                 <IDE />
                                 <Button
-                                    className="absolute"
+                                    className="absolute z-50"
                                     style={{ bottom: "16px", right: "16px" }}
                                     size="sm"
                                     onClick={handleCompile}

@@ -1,5 +1,7 @@
-import { Address, Contract, nativeToScVal, StrKey, xdr } from "@stellar/stellar-sdk";
+import { Address, BASE_FEE, Contract, nativeToScVal, rpc, StrKey, xdr } from "@stellar/stellar-sdk";
 import BigNumber from 'bignumber.js';
+import { randomBytes } from "crypto";
+import { SorideTransactionBuilder } from "./transaction-builder";
 
 /**
  * CBKGPQUWV55UPWCMQ4CZP3BU3RANV7TKKI2OOMRMII7YPGKOCXKHACFL -> 5467c296af7b47d84c870597ec34dc40dafe6a5234e7322c423f87994e15d470
@@ -204,3 +206,18 @@ export const xlmToStroop = (lumens: BigNumber | string): BigNumber => {
 
     return lumensValue.times(1e7);
 };
+
+export const Salt = (length: number = 32): Buffer => {
+    const salt = randomBytes(length);
+    return salt;
+}
+
+export const initaliseTransactionBuilder = async (server: rpc.Server, publicKey: string, fee: string = BASE_FEE) => {
+    const network = await server.getNetwork();
+    const source = await server.getAccount(publicKey);
+
+    return new SorideTransactionBuilder(source, {
+        fee,
+        networkPassphrase: network.passphrase,
+    });
+}

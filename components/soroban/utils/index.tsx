@@ -17,14 +17,18 @@ interface UtiltyTabProps extends React.HTMLAttributes<HTMLDivElement> { }
 enum Tab {
   CONTRACT_CONVERT = "Contract Id Converter",
   UNIT_CONVERT = "XLM Unit Conversion",
+  WASM_ABI = "WASM ABI",
 }
 
 const LazyContractConverter = lazy(() => import("@/components/soroban/utils/items/contract"))
 const LazyUnitConverter = lazy(() => import("@/components/soroban/utils/items/unit"))
+const LazyWasmToAbi = lazy(() => import("@/components/soroban/utils/items/abi"))
 
 const tabsData = [
   { key: Tab.CONTRACT_CONVERT, component: <LazyContractConverter /> },
   { key: Tab.UNIT_CONVERT, component: <LazyUnitConverter /> },
+  { key: Tab.WASM_ABI, component: <LazyWasmToAbi /> },
+
 ]
 
 export function UtiltyTab({ className }: UtiltyTabProps) {

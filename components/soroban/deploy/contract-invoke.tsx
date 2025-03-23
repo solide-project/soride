@@ -16,11 +16,16 @@ import {
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getTransactionExplorer } from "@/lib/chains/explorer";
 import { ConnectWallet } from "../wallet";
-import { getContractId, isContractHash, isContractId, scSpecTypeToScVal, toScVal } from "@/lib/stellar/utils";
-import { Abi, AbiFunction, AbiParameter } from "@/lib/stellar/abi";
+import { getContractId, hexToByte, isContractHash, isContractId, scSpecTypeToScVal, toScVal } from "@/lib/stellar/utils";
+import { Abi, AbiConstructor, AbiFunction, AbiParameter } from "@/lib/stellar/abi";
 import { xdr } from "@stellar/stellar-sdk";
+import { getAddress, getNetwork } from "@stellar/freighter-api";
+import { _code, _specs, _abi } from "@/lib/stellar/soroban-contract";
 
 interface ContractInvokeProps extends React.HTMLAttributes<HTMLDivElement> { }
+
+const CONSTRUCTOR_METHOD = "__constructor"
+const CONSTRUCTOR_TYPE = "constructor"
 
 export function ContractInvoke({ className }: ContractInvokeProps) {
     const web3Hook = useWeb3Hook();
@@ -33,31 +38,6 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
         [key: string]: any
     }>({})
 
-    // //#region ABI
-    // const [processedABI, setProcessedABI] = useState<ABIEntry[]>([])
-
-    // useEffect(() => {
-    //     try {
-    //         const parsedABI = parse(abi)
-    //         setProcessedABI(
-    //             parsedABI.map((method: ABIEntry) => {
-    //                 if (method.type === "function" && method.inputs) {
-    //                     method.inputs.forEach(
-    //                         (input: ABIParameter, index: number) => {
-    //                             input.name = input.name === "" ? `input${index}` : input.name
-    //                         }
-    //                     )
-    //                 }
-    //                 return method
-    //             })
-    //         )
-    //     } catch (e: any) {
-    //         // logger.error("Invalid ABI")
-    //         // console.error(e)
-    //     }
-    // }, [abi])
-    // //#endregion
-
     //#region Deploy
     const [isDeploying, setIsDeploying] = useState(false)
 
@@ -69,36 +49,55 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
             logger.error(e.message || "Error deploying contract")
             console.error(e)
         } finally {
+            setSelectedConstructor(null)
             setIsDeploying(false)
         }
     }
 
     const doDeploy = async () => {
-        if (!window.ethereum) {
-            throw new Error("Please install MetaMask to deploy contract");
+        const { address } = await getAddress()
+        if (!address) {
+            throw new Error("Please install Freighter to deploy contract");
         }
 
         logger.info("Deploying contract...")
 
-        // This is to determined if we are deploying an existing contract
-        const isPreDeployed = !!contractAddress
-
         // CBKGPQUWV55UPWCMQ4CZP3BU3RANV7TKKI2OOMRMII7YPGKOCXKHACFL
         // 9477b807cb752af9f1e63062e6fbe75156401af3e87f71813574884f4f800ef5
+        // Do some verification of input if deploying existing contract
         let contractId = contractAddress
-        if (isContractHash(contractId)) {
-            contractId = getContractId(contractId)
-        }
+        let args: xdr.ScVal[] = []
+        if (contractId) {
+            if (isContractHash(contractId)) {
+                contractId = getContractId(contractId)
+            }
 
-        if (!isContractId(contractId)) {
-            throw new Error("Invalid Contract ID or Contract Hash");
-        }
+            if (!isContractId(contractId)) {
+                throw new Error("Invalid Contract ID or Contract Hash");
+            }
+        } else {
+            if (!contractWasm) {
+                throw new Error("Unable to found contract. Make sure to deploy a Wasm from the contract");
+            }
 
-        const result = await web3Hook.doDeploy({ contractId, deployData: "" })
+            const contractConstructor = soroban.abi.find((abi) => abi.type === CONSTRUCTOR_TYPE)
+            args = contractAddress || !contractConstructor
+                ? []
+                : formatParameters(contractConstructor)
+        }
+        const result = await web3Hook.doDeploy({ contractId, wasmId: contractWasm, userAddress: address, args });
         if (result.contract) {
             setContractAddress(result.contract)
             logger.success(`Contract deployed at ${result.contract}`)
-
+            if (result.transactionHash) {
+                const { network } = await getNetwork()
+                const txExplorer = getTransactionExplorer(network, result.transactionHash)
+                logger.success(
+                    <a className="underline" href={txExplorer} target="_blank">
+                        {result.transactionHash}
+                    </a>
+                )
+            }
             setContractArguments({
                 ...contractArguments,
                 [result.contract]: {},
@@ -136,10 +135,17 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
         }))
     }
 
-    const formatParameters = (entry: AbiFunction): any[] => {
+    const formatParameters = (entry: AbiFunction | AbiConstructor): xdr.ScVal[] => {
         if (!entry) return []
 
-        const methodArgs = contractArguments[selectedContractAddress]?.[entry.name]
+        const method =
+            entry.type === CONSTRUCTOR_TYPE ? CONSTRUCTOR_METHOD : entry.name
+        const selected =
+            entry.type === CONSTRUCTOR_TYPE
+                ? CONSTRUCTOR_METHOD
+                : selectedContractAddress
+
+        const methodArgs = contractArguments[selected]?.[method]
         if (!methodArgs) return []
 
         return entry.inputs.map((input: AbiParameter, index: number) => {
@@ -155,7 +161,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
     }
     //#endregion
 
-    // //#region Contract Calls
+    //#region Contract Calls
     const [isInvoking, setIsInvoking] = useState<boolean>(false)
 
     const initialiseInvocation = (method: string) => {
@@ -252,7 +258,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
             setRet({ ...ret, [entry.name]: result })
         }
     }
-    // //#endregion
+    //#endregion
 
     const handleError = (error: any) => {
         let msg = error && error.toString()
@@ -268,16 +274,89 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
     const [selectedAbiParameter, setSelectedAbiParameter] =
         useState<AbiFunction | null>(null)
 
-    // const [selectedConstructor, setSelectedConstructor] =
-    //     useState<AbiConstructor | null>(null)
+    const [selectedConstructor, setSelectedConstructor] =
+        useState<AbiConstructor | null>(null)
 
     const handleRemoveContract = (contractAddress: string) => {
         web3Hook.removeContract(contractAddress)
     }
 
+    //#region Deploy Wasm
+    const [contractWasm, setContractWasm] = useState<string>("")
+    const [isDeployingWasm, setIsDeployingWasm] = useState(false)
+
+    const handleDeployWasm = async () => {
+        try {
+            setIsDeployingWasm(true)
+            await doDeployWasm();
+        } catch (e: any) {
+            logger.error(e.message || "Error deploying contract")
+            console.error(e)
+        } finally {
+            setIsDeployingWasm(false)
+        }
+    }
+
+    const doDeployWasm = async () => {
+        const { address } = await getAddress()
+        if (!address) {
+            throw new Error("Please install Freighter to deploy contract");
+        }
+
+        logger.info("Deploying wasm...")
+
+        if (!soroban.wasm) {
+            return Promise.reject("Invalid or Missing WebAssembly (wasm)");
+        }
+
+        if (soroban.wasm.type !== "application/wasm") {
+            throw new Error("Invalid wasm type. Expected 'application/wasm'.");
+        }
+
+        const result = await web3Hook.doDeployWasm({ wasmData: soroban.wasm, userAddress: address })
+
+        if (!result.wasmId) {
+            throw new Error("Wasm Deploy Failed. Please recompile to ensure Wasm is valid")
+        }
+
+        setContractWasm(result.wasmId)
+
+        // Get constructor if exist
+        const code = await _code(soroban.networkServer, hexToByte(result.wasmId));
+        const specs = await _specs(code);
+        const abi = await _abi(specs);
+        soroban.setABI(abi)
+
+        logger.success(`Contract Wasm deployed at ${result.wasmId}`)
+        if (result.transactionHash) {
+            const { network } = await getNetwork()
+            const txExplorer = getTransactionExplorer(network, result.transactionHash)
+            logger.success(
+                <a className="underline" href={txExplorer} target="_blank">
+                    {result.transactionHash}
+                </a>
+            )
+        }
+    }
+    //#endregion
+
     return <div>
         <div className="flex items-center justify-center my-2">
             <ConnectWallet />
+        </div>
+        <div className="flex">
+            <Button
+                size="sm"
+                onClick={handleDeployWasm}
+                variant="default"
+                disabled={isDeployingWasm}
+            >
+                Deploy Wasm
+            </Button>
+
+            {contractWasm && <div>
+                Selected Wasm: {contractWasm}
+            </div>}
         </div>
         <div className="flex">
             <Button
@@ -295,6 +374,18 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                 onChange={(e) => setContractAddress(e.target.value)}
             />
         </div>
+
+        {(soroban.abi as Abi)
+            .filter((abi) => abi.type === "constructor")
+            .map((abi, index: number) => {
+                return (
+                    <div key={index}>
+                        <Button onClick={() => setSelectedConstructor(abi)}>
+                            Deploy New Contract
+                        </Button>
+                    </div>
+                )
+            })}
 
         <div className="flex items-center justify-center">
             <div className="py-2 font-semibold text-grayscale-350">Value (wei)</div>
@@ -408,7 +499,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                 )}
             </DialogContent>
         </Dialog>
-        {/*
+
         <Dialog
             open={!!selectedConstructor}
             onOpenChange={() => {
@@ -438,7 +529,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                                                 CONSTRUCTOR_METHOD
                                                 ]?.[input.name || abiIndex.toString()]
                                             }
-                                            placeholder={input.type}
+                                            placeholder={scSpecTypeToScVal(input.type.name)}
                                             onChange={(e) =>
                                                 handleArgumentChange(
                                                     CONSTRUCTOR_METHOD,
@@ -459,6 +550,6 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                     </>
                 )}
             </DialogContent>
-        </Dialog> */}
+        </Dialog>
     </div>
 }

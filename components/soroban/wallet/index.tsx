@@ -10,7 +10,6 @@ export function ConnectWallet({ }: ConnectWalletProps) {
 
     const loadUser = () => {
         getAddress().then(result => {
-            console.log(result.address)
             setUserAddress(result.address || "")
         })
     }

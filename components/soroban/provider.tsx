@@ -5,11 +5,12 @@ import { getServer } from "@/lib/stellar/server"
 import { CompileError } from "@/lib/soroban"
 import { rpc } from "@stellar/stellar-sdk"
 import React, { createContext, useContext, useEffect, useState } from "react"
+import { Abi } from "@/lib/stellar/abi"
 
 export const SorobanProvider = ({ children }: SorobanProviderProps) => {
     const [tomlPath, setTomlPath] = useState<string>("")
 
-    const [abi, setABI] = useState<string>("")
+    const [abi, setABI] = useState<Abi>([])
     const [errors, setErrors] = useState<CompileError>({} as CompileError)
 
     const [wasm, setWasm] = useState<Blob>({} as Blob)
@@ -64,8 +65,8 @@ export const SorobanContext = createContext({
     setWasm: (_: Blob) => { },
     deployData: "",
     setDeployData: (_: string) => { },
-    abi: "",
-    setABI: (_: string) => { },
+    abi: [] as Abi,
+    setABI: (_: Abi) => { },
     errors: {} as CompileError,
     setErrors: (_: CompileError) => { },
     resetBuild: () => { },

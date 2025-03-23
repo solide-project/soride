@@ -1,14 +1,17 @@
 import { xdr } from "@stellar/stellar-sdk"
 
 export type AbiItemType =
-  | 'constructor'
-  | 'error'
-  | 'event'
-  | 'fallback'
-  | 'function'
-  | 'receive'
+    | 'constructor'
+    | 'error'
+    | 'event'
+    | 'fallback'
+    | 'function'
+    | 'receive'
 
-export type Abi = readonly (
+export type AbiType = AbiConstructor
+    | AbiFunction
+
+    export type Abi = readonly (
     AbiConstructor
     | AbiFunction
 )[]
