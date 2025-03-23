@@ -7,7 +7,7 @@ export interface InvokeParam {
     args: any[]
     value?: string
     gas?: string
-    userAddress?: string
+    userAddress: string
 }
 
 export interface ISmartContract {

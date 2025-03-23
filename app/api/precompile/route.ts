@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from "next/server"
 import JSZip from "jszip";
 
 export async function POST(request: NextRequest) {
-    const contract = "soroban_increment_with_pause_contract"
+    // const contract = "soroban_increment_with_pause_contract"
+    const contract = "soroban_token_contract"
     const wasmDirectory = path.resolve('./public/precompile', `${contract}.wasm`);
     const wasm: Buffer = fs.readFileSync(wasmDirectory);
 

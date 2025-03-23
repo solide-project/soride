@@ -15,30 +15,38 @@ export const useWeb3Hook = () => {
         contractAddress: string,
         method: string,
         args: xdr.ScVal[],
-        value: number = 0
+        value: number = 0,
+        userAddress: string,
     ) => {
-        // contractAddress = getAddress(contractAddress)
         if (!contracts.hasOwnProperty(contractAddress)) {
             throw new Error("Contract not loaded")
         }
 
+        console.log({
+            method,
+            args,
+            value: value.toString(),
+            userAddress
+        })
         return contracts[contractAddress].send({
             method,
             args,
             value: value.toString(),
+            userAddress
         })
     }
 
     const executeCall = async (
         contractAddress: string,
         method: string,
-        args: xdr.ScVal[]
+        args: xdr.ScVal[],
+        userAddress: string,
     ) => {
         if (!contracts.hasOwnProperty(contractAddress)) {
             throw new Error("Contract not loaded")
         }
 
-        return contracts[contractAddress].call({ method, args })
+        return contracts[contractAddress].call({ method, args, userAddress })
     }
 
     const removeContract = (contractAddress: string) => {
@@ -96,7 +104,6 @@ export const useWeb3Hook = () => {
             const contract = new SorobanSmartContract(contractId, networkServer)
             await contract.init()
 
-            console.log(contract.abi)
             setContracts({
                 ...contracts,
                 [contractId]: contract,
@@ -127,7 +134,6 @@ export const useWeb3Hook = () => {
         const contract = new SorobanSmartContract(contractId, networkServer)
         await contract.init()
 
-        console.log(contract.abi)
         setContracts({
             ...contracts,
             [contractId]: contract,

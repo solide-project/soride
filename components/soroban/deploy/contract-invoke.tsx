@@ -179,30 +179,32 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
 
     const invokeSend = async (method: string) => {
         try {
+            const { address } = await getAddress()
+            if (!address) {
+                throw new Error("Please install Freighter to deploy contract");
+            }
+
             initialiseInvocation(method)
 
             // This should be the transaction hash
-            console.log(msgValue)
             const result = await web3Hook.executeSend(
                 selectedContractAddress,
                 method,
                 formatParameters(selectedAbiParameter!),
-                msgValue
+                msgValue,
+                address
             )
-            const tx = result.toString()
 
-            // formatOutput(selectedAbiParameter, result)
-            const hex = await window.ethereum.request({ method: "eth_chainId" })
-            const chainId = parseInt(hex, 16).toString()
-            const txExplorer = getTransactionExplorer(chainId, tx)
-            if (txExplorer) {
+            if (result.txHash) {
+                const { network } = await getNetwork()
+                const txExplorer = getTransactionExplorer(network, result.txHash)
                 logger.success(
                     <a className="underline" href={txExplorer} target="_blank">
-                        {tx}
+                        {result.txHash}
                     </a>
                 )
             } else {
-                logger.success(tx)
+                logger.success(JSON.stringify(result))
             }
         } catch (error: any) {
             logger.error(handleError(error), true)
@@ -216,16 +218,19 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
         try {
             initialiseInvocation(method)
 
-            // This should be the transaction hash
-            const args = formatParameters(selectedAbiParameter!)
-            console.log(args)
-            // const result = await web3Hook.executeCall(
-            //     selectedContractAddress,
-            //     method,
-            //     formatParameters(selectedAbiParameter!)
-            // )
+            const { address } = await getAddress()
+            if (!address) {
+                throw new Error("Please install Freighter to deploy contract");
+            }
 
-            // formatOutput(selectedAbiParameter!, result)
+            const result = await web3Hook.executeCall(
+                selectedContractAddress,
+                method,
+                formatParameters(selectedAbiParameter!),
+                address
+            )
+
+            formatOutput(selectedAbiParameter!, result)
         } catch (error: any) {
             logger.error(handleError(error), true)
         } finally {
@@ -235,28 +240,22 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
     }
 
     const formatOutput = (entry: AbiFunction, result: any) => {
-        // console.log("formatOutput", entry, result)
-        if (entry.outputs && entry.outputs.length > 0) {
-            // if (typeof result === "object") {
-            //     result = JSON.stringify(result, (_, v) =>
-            //         typeof v === "bigint" ? v.toString() : v
-            //     )
-            // } else if (entry.outputs[0].type.includes("int")) {
-            //     result = result.toString() as BigInt
-            // } else {
-            //     result = result as string
-            // }
-
-            logger.info(
-                <div className="flex items-center gap-2">
-                    <ArrowLeft size={18} /> <div>{result}</div>
-                </div>
+        if (typeof result === "object") {
+            result = JSON.stringify(result, (_, v) =>
+                typeof v === "bigint" ? v.toString() : v
             )
-            setRet({ ...ret, [entry.name]: result })
+        } else if (typeof result === "bigint") {
+            result = result.toString()
         } else {
-            logger.success(result)
-            setRet({ ...ret, [entry.name]: result })
+            result = result as string
         }
+
+        logger.info(
+            <div className="flex items-center gap-2">
+                <ArrowLeft size={18} /> <div>{result}</div>
+            </div>
+        )
+        setRet({ ...ret, [entry.name]: result })
     }
     //#endregion
 
@@ -344,7 +343,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
         <div className="flex items-center justify-center my-2">
             <ConnectWallet />
         </div>
-        <div className="flex">
+        <div className="flex break-all my-2">
             <Button
                 size="sm"
                 onClick={handleDeployWasm}
@@ -358,7 +357,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                 Selected Wasm: {contractWasm}
             </div>}
         </div>
-        <div className="flex">
+        <div className="flex my-2">
             <Button
                 size="sm"
                 onClick={handleDeploy}
@@ -388,7 +387,7 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
             })}
 
         <div className="flex items-center justify-center">
-            <div className="py-2 font-semibold text-grayscale-350">Value (wei)</div>
+            <div className="py-2 font-semibold text-grayscale-350">Value (stroop)</div>
             <Input
                 className="h-9 rounded-md px-3"
                 placeholder="Value"
@@ -478,23 +477,24 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                             }
                         )}
 
-                        <Button
-                            onClick={() => {
-                                if (selectedAbiParameter.outputs?.length >= 0) {
+                        <div className="flex items-center justify-center gap-2 w-full">
+                            <Button className="w-full"
+                                onClick={() => {
                                     invokeCall(selectedAbiParameter.name)
-                                    return
-                                } else {
+                                }}
+                                disabled={isInvoking}
+                            >
+                                {isInvoking ? "Invoking..." : "Call"}
+                            </Button>
+                            <Button className="w-full"
+                                onClick={() => {
                                     invokeSend(selectedAbiParameter.name)
-                                }
-                            }}
-                            disabled={isInvoking}
-                        >
-                            {isInvoking
-                                ? "Invoking..."
-                                : selectedAbiParameter.outputs?.length >= 0
-                                    ? "Call"
-                                    : "Send"}
-                        </Button>
+                                }}
+                                disabled={isInvoking}
+                            >
+                                {isInvoking ? "Invoking..." : "Send"}
+                            </Button>
+                        </div>
                     </>
                 )}
             </DialogContent>

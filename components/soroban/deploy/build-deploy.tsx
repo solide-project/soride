@@ -43,7 +43,7 @@ export function BuildDeploy({ className }: BuildDeployProps) {
 
             <Select onValueChange={(val: string) => setActiveTab(val as Tab)}>
                 <SelectTrigger className="w-full mb-2 bg-transparent border-none font-bold flex items-center justify-center space-x-4">
-                    <SelectValue placeholder="Theme" />
+                    <SelectValue placeholder={Tab.INTERACT} />
                 </SelectTrigger>
                 <SelectContent>
                     {tabsData.map(x => x.key).map((tab, index) => (
