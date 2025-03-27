@@ -20,3 +20,11 @@ eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 # Install stellar cli
 brew install stellar-cli
 ```
+
+## Rustup
+
+Make sure to change the `settings.toml` in the .rustup
+
+```
+"~/soride" = "1.81.0-x86_64-unknown-linux-gnu"
+```
