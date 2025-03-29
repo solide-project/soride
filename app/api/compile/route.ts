@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         fs.rmSync(mainDir, { recursive: true });
 
         const zip = new JSZip();
-        zip.file("results.json", JSON.stringify(output));
+        // zip.file("results.json", JSON.stringify(output));
         zip.file(`contract.wasm`, new Uint8Array(wasm));
 
         // Generate the zip file as a Blob (Node.js environment uses Buffers)
@@ -74,7 +74,6 @@ export async function POST(request: NextRequest) {
                 "Content-Disposition": `attachment; filename=${data.package.name}.zip`
             }
         });
-
     } catch (error: any) {
         console.log('error', error)
         let errorMessage: string = stripAnsi(error.stderr || error.stdout || error.message || "Internal error while compiling.");

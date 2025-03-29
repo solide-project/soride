@@ -121,8 +121,8 @@ export function SorobanIDE({
         const source: any = { sources }
         const body = { input: source }
 
-        // const response = await fetch(`/api/compile${queryBuilder.build()}`, {
-        const response = await fetch(`/api/precompile`, {
+        const response = await fetch(`/api/compile${queryBuilder.build()}`, {
+        // const response = await fetch(`/api/precompile`, {
             method: "POST",
             body: JSON.stringify(body),
         })
