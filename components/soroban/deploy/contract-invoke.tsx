@@ -16,7 +16,7 @@ import {
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { getTransactionExplorer } from "@/lib/chains/explorer";
 import { ConnectWallet } from "../wallet";
-import { getContractId, hexToByte, isContractHash, isContractId, scSpecTypeToScVal, toScVal } from "@/lib/stellar/utils";
+import { getContractHash, getContractId, hexToByte, isContractHash, isContractId, scSpecTypeToScVal, toScVal } from "@/lib/stellar/utils";
 import { Abi, AbiConstructor, AbiFunction, AbiParameter } from "@/lib/stellar/abi";
 import { xdr } from "@stellar/stellar-sdk";
 import { getAddress, getNetwork } from "@stellar/freighter-api";
@@ -406,7 +406,22 @@ export function ContractInvoke({ className }: ContractInvokeProps) {
                     onClosed={() => handleRemoveContract(key)}
                 >
                     <div>
-                        {val.wasmHash}
+                        <div className="flex items-center gap-2 truncate">
+                            <div>
+                                Wasm Hash:
+                            </div>
+                            <div>
+                                {val.wasmHash}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 truncate">
+                            <div>
+                                Contract Id:
+                            </div>
+                            <div>
+                                {getContractHash(val.contractAddress) || ""}
+                            </div>
+                        </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {(val.abi as Abi)
